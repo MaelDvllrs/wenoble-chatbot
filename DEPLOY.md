@@ -161,20 +161,40 @@ curl -I https://ask-ai.wenoble.fr/widget/widget.js
 
 ## 2. Admin sur Vercel
 
-Dans Vercel → **New Project** → importer le dépôt :
+Le déploiement se fait **depuis la racine du monorepo**, pas depuis `admin/`.
+C'est ce que décrit [vercel.json](vercel.json) : `npm install` à la racine (le
+`package-lock.json` y est, npm workspaces oblige), puis build de l'admin seul, et
+sortie dans `admin/.next`.
 
-- **Root Directory** : `wenoble-chatbot/admin`
-- **Framework** : Next.js (détecté)
-- Laisser « Include files outside root directory » **activé** : le `package-lock.json`
-  est à la racine du monorepo (npm workspaces).
+Déployer `admin/` directement échouerait : Vercel n'y trouverait pas le lockfile.
 
-Variables d'environnement (Production) :
+### Avec le CLI
 
+```bash
+npm i -g vercel
+cd wenoble-chatbot     # la racine du monorepo, PAS admin/
+vercel login
+vercel link            # crée le projet (ou le relie à un projet existant)
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-NEXT_PUBLIC_BACKEND_URL=https://ask-ai.wenoble.fr
+
+Variables d'environnement — à faire **avant** le premier déploiement, sinon le
+build produit une app qui ne peut pas joindre Supabase :
+
+```bash
+vercel env add NEXT_PUBLIC_SUPABASE_URL production
+vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production
+vercel env add NEXT_PUBLIC_BACKEND_URL production   # https://ask-ai.wenoble.fr
 ```
+
+Répète avec `preview` si tu veux des déploiements de preview fonctionnels.
+
+Puis :
+
+```bash
+vercel --prod
+```
+
+Pour vérifier ce qui est configuré : `vercel env ls`.
 
 **Ne jamais mettre `SUPABASE_SERVICE_ROLE_KEY` dans Vercel.** L'admin lit la base
 avec la clé `anon` + la session de l'utilisateur : c'est la RLS qui protège les

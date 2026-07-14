@@ -44,3 +44,6 @@ Thumbs.db
 # Supabase CLI
 supabase/.branches/
 supabase/.temp/
+
+# Vercel CLI (contient l'ID du projet, lié au compte)
+.vercel/
