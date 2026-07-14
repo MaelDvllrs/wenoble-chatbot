@@ -100,9 +100,46 @@ en cluster imposerait d'abord de déporter le rate limit dans Redis.
 
 ### Reverse proxy
 
+**Apache et nginx ne peuvent pas écouter le même port.** Si Apache tourne déjà
+sur le VPS (autres services), utilise-le comme reverse proxy et ignore nginx :
+c'est la même fonction, et rien d'autre n'est à toucher.
+
+#### Option A — Apache (si déjà installé)
+
 ```bash
-sudo cp deploy/nginx.conf /etc/nginx/sites-available/ask-ai.wenoble.fr
-sudo ln -s /etc/nginx/sites-available/ask-ai.wenoble.fr /etc/nginx/sites-enabled/
+sudo a2enmod proxy proxy_http headers
+sudo cp deploy/apache.conf /etc/apache2/sites-available/ask-ai.wenoble.fr.conf
+sudo a2ensite ask-ai.wenoble.fr
+sudo apache2ctl configtest && sudo systemctl reload apache2
+sudo certbot --apache -d ask-ai.wenoble.fr
+```
+
+Le vhost désactive **mod_deflate** (`no-gzip`, `RequestHeader unset
+Accept-Encoding`) sur ce domaine. C'est indispensable : en compressant le flux
+SSE, Apache l'accumulerait dans un tampon et le visiteur ne verrait rien arriver
+avant la fin de la réponse. Le streaming serait perdu.
+
+#### Option B — nginx (si Apache n'est pas là)
+
+Vérifie d'abord quel dossier ta conf nginx inclut — sinon le fichier serait
+ignoré silencieusement :
+
+```bash
+grep -rE "include.*(sites-enabled|conf\.d)" /etc/nginx/nginx.conf
+```
+
+Puis, selon le cas :
+
+```bash
+# Si sites-enabled est inclus (le lien depuis sites-available est facultatif :
+# c'est une convention Debian, pas une exigence de nginx)
+sudo cp deploy/nginx.conf /etc/nginx/sites-enabled/ask-ai.wenoble.fr
+
+# Si seul conf.d est inclus — le nom DOIT finir par .conf
+sudo cp deploy/nginx.conf /etc/nginx/conf.d/ask-ai.wenoble.fr.conf
+```
+
+```bash
 sudo nginx -t && sudo systemctl reload nginx
 sudo certbot --nginx -d ask-ai.wenoble.fr
 ```
