@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk';
-import { anthropic, CHAT_MODEL, MAX_TOKENS } from '../lib/clients';
+import { anthropic, MAX_TOKENS } from '../lib/clients';
+import { env } from '../lib/env';
 import { getSystemPrompt } from '../lib/prompt';
 import { getSitemap } from '../lib/sitemap';
 import { formatContext, retrieve } from './rag';
@@ -67,7 +68,7 @@ export async function chat(sessionId: string, question: string): Promise<ChatRes
   ];
 
   const stream = anthropic.messages.stream({
-    model: CHAT_MODEL,
+    model: env.CHAT_MODEL,
     max_tokens: MAX_TOKENS,
     // Sur Sonnet 5, OMETTRE ce paramètre active la réflexion adaptative par
     // défaut : le modèle réfléchirait avant chaque réponse, ajoutant latence et

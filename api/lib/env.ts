@@ -30,15 +30,42 @@ const schema = z.object({
   MAX_MESSAGES_PER_CONVERSATION: z.coerce.number().default(40),
 });
 
-const parsed = schema.safeParse(process.env);
+type Env = z.infer<typeof schema> & {
+  isProd: boolean;
+  allowedOrigins: string[];
+};
 
-if (!parsed.success) {
-  console.error('Variables d’environnement invalides :', z.treeifyError(parsed.error));
-  throw new Error('Configuration invalide — voir .env.example');
+let cached: Env | null = null;
+
+function load(): Env {
+  const parsed = schema.safeParse(process.env);
+
+  if (!parsed.success) {
+    console.error('Variables d’environnement invalides :', z.treeifyError(parsed.error));
+    throw new Error('Configuration invalide — voir api/.env.example');
+  }
+
+  return {
+    ...parsed.data,
+    isProd: process.env.NODE_ENV === 'production',
+    allowedOrigins: parsed.data.ALLOWED_ORIGINS.split(',').map((o) => o.trim()),
+  };
 }
 
-export const env = {
-  ...parsed.data,
-  isProd: process.env.NODE_ENV === 'production',
-  allowedOrigins: parsed.data.ALLOWED_ORIGINS.split(',').map((o) => o.trim()),
-};
+/**
+ * Validation PARESSEUSE : elle ne se déclenche qu'au premier accès, donc à la
+ * première requête, jamais à l'import du module.
+ *
+ * Valider au chargement faisait échouer le build Vercel : Next exécute les
+ * modules des routes pour collecter leurs métadonnées (« Failed to collect page
+ * data »), à un moment où les variables d'exécution ne sont pas nécessairement
+ * là. Un build ne doit pas dépendre de secrets de runtime.
+ *
+ * Le Proxy permet de garder `env.MA_VAR` partout, sans changer les appelants.
+ */
+export const env: Env = new Proxy({} as Env, {
+  get(_target, prop) {
+    cached ??= load();
+    return cached[prop as keyof Env];
+  },
+});
