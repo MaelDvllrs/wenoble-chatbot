@@ -1,5 +1,5 @@
-import { supabase } from './supabase.js';
-import { logger } from './logger.js';
+import { supabase } from './clients';
+/* logger pino remplacé par console : pas de logger custom en serverless. */
 
 interface Page {
   url: string;
@@ -50,7 +50,7 @@ async function build(): Promise<string> {
   const blog = all.filter((p) => p.type === 'blog');
 
   if (blog.length > MAX_BLOG_PAGES) {
-    logger.warn(
+    console.warn(
       `Sitemap : ${blog.length} articles de blog, tronqué à ${MAX_BLOG_PAGES} dans le prompt.`,
     );
   }
@@ -91,7 +91,7 @@ export function getSitemap(): Promise<string> {
   if (!cached) {
     cached = build().catch((err) => {
       // Un sitemap indisponible ne doit pas casser le chat : on répond sans lui.
-      logger.error({ err }, 'Sitemap indisponible — les réponses seront sans liens.');
+      console.error('Sitemap indisponible — les réponses seront sans liens.', err);
       return '';
     });
   }

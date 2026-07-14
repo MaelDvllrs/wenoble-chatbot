@@ -1,5 +1,0 @@
-# Logique métier à venir :
-#   chat.service.ts       — orchestration de la conversation avec Claude
-#   rag.service.ts        — recherche de similarité sur `documents` (pgvector)
-#   embeddings.service.ts — appels à l'API Voyage AI
-#   leads.service.ts      — détection et persistance des leads

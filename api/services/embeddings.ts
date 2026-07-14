@@ -1,5 +1,5 @@
-import { env } from '../lib/env.js';
-import { EMBEDDING_DIMENSIONS } from '../lib/anthropic.js';
+import { env } from '../lib/env';
+import { EMBEDDING_DIMENSIONS } from '../lib/clients';
 
 const VOYAGE_URL = 'https://api.voyageai.com/v1/embeddings';
 

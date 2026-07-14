@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase.js';
+import { supabase } from '../lib/clients';
 
 export type Role = 'user' | 'assistant';
 

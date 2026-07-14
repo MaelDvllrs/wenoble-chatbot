@@ -1,5 +1,5 @@
-import { supabase } from '../lib/supabase.js';
-import { embedQuery } from './embeddings.service.js';
+import { supabase } from '../lib/clients';
+import { embedQuery } from './embeddings';
 
 export interface Match {
   id: string;

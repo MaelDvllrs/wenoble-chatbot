@@ -1,27 +1,26 @@
 import type Anthropic from '@anthropic-ai/sdk';
-import { anthropic, CHAT_MODEL, MAX_TOKENS } from '../lib/anthropic.js';
-import { SYSTEM_PROMPT } from '../lib/prompt.js';
-import { getSitemap } from '../lib/sitemap.js';
-import { formatContext, retrieve } from './rag.service.js';
-import {
-  getOrCreateConversation,
-  loadHistory,
-  saveMessage,
-} from './conversations.service.js';
+import { anthropic, CHAT_MODEL, MAX_TOKENS } from '../lib/clients';
+import { getSystemPrompt } from '../lib/prompt';
+import { getSitemap } from '../lib/sitemap';
+import { formatContext, retrieve } from './rag';
+import { getOrCreateConversation, loadHistory, saveMessage } from './conversations';
 
 export interface ChatResult {
   conversationId: string;
-  /** Flux de fragments de texte, à relayer tel quel au widget. */
   stream: AsyncGenerator<string>;
 }
 
 /**
- * Un tour de conversation.
+ * Supprime les tirets cadratins et demi-cadratins.
  *
- * Renvoie immédiatement un générateur : l'appelant (la route SSE) itère dessus
- * pour pousser le texte au fur et à mesure. La réponse complète n'est écrite en
- * base qu'une fois le flux terminé.
+ * L'instruction existe dans le system prompt, mais le modèle ne la respecte pas
+ * de façon fiable. Une règle typographique est de toute façon mieux appliquée
+ * par du code : c'est garanti, immédiat, et ça ne coûte pas un token.
  */
+function stripDashes(text: string): string {
+  return text.replace(/\s*[—–]\s*/g, ', ');
+}
+
 export async function chat(sessionId: string, question: string): Promise<ChatResult> {
   const conversationId = await getOrCreateConversation(sessionId);
 
@@ -34,16 +33,13 @@ export async function chat(sessionId: string, question: string): Promise<ChatRes
   const [matches, sitemap] = await Promise.all([retrieve(question), getSitemap()]);
   const context = formatContext(matches);
 
-  // Le contexte RAG change à chaque question : il va dans le DERNIER tour
-  // utilisateur, jamais dans le system prompt. Y toucher invaliderait le
-  // préfixe mis en cache par l'API à chaque requête.
   const contextBlock = context
     ? context
     : "Aucun extrait pertinent n'a été trouvé dans le contenu de Wenoble.";
 
   // Rappel placé en TOUT DERNIER, après la question : c'est la position la plus
   // suivie par le modèle. Les mêmes consignes existent dans le system prompt,
-  // mais Haiku les applique mal depuis le milieu d'un long prompt.
+  // mais elles y sont bien moins appliquées depuis le milieu d'un long prompt.
   const reminder = [
     '<consigne>',
     'COURT : 60 mots maximum, 2 ou 3 phrases, un seul paragraphe, un seul argument.',
@@ -60,6 +56,9 @@ export async function chat(sessionId: string, question: string): Promise<ChatRes
     '</consigne>',
   ].join('\n');
 
+  // Le contexte RAG change à chaque question : il va dans le DERNIER tour
+  // utilisateur, jamais dans le system prompt, dont la moindre modification
+  // invaliderait le préfixe mis en cache par l'API.
   const userTurn = `${contextBlock}\n\nQuestion du visiteur : ${question}\n\n${reminder}`;
 
   const messages: Anthropic.MessageParam[] = [
@@ -72,16 +71,15 @@ export async function chat(sessionId: string, question: string): Promise<ChatRes
     max_tokens: MAX_TOKENS,
     // Sur Sonnet 5, OMETTRE ce paramètre active la réflexion adaptative par
     // défaut : le modèle réfléchirait avant chaque réponse, ajoutant latence et
-    // tokens pour une tâche qui n'en a pas besoin (reformuler des extraits
-    // qu'on lui fournit déjà). On la coupe explicitement.
+    // tokens pour une tâche qui n'en a pas besoin.
     thinking: { type: 'disabled' },
     system: [
       {
         type: 'text',
-        // Le sitemap est concaténé au system prompt : il est identique à chaque
-        // appel, donc il appartient au préfixe cachable. Le mettre dans le tour
-        // utilisateur le ferait repayer plein tarif à chaque question.
-        text: `${SYSTEM_PROMPT}\n\n${sitemap}`,
+        // Le sitemap est identique à chaque appel : il appartient donc au
+        // préfixe cachable. Le mettre dans le tour utilisateur le ferait
+        // repayer plein tarif à chaque question.
+        text: `${getSystemPrompt()}\n\n${sitemap}`,
         cache_control: { type: 'ephemeral' },
       },
     ],
@@ -89,18 +87,6 @@ export async function chat(sessionId: string, question: string): Promise<ChatRes
   });
 
   return { conversationId, stream: relay(stream, conversationId) };
-}
-
-/**
- * Supprime les tirets cadratins et demi-cadratins.
- *
- * L'instruction correspondante existe dans le system prompt, mais Haiku ne la
- * respecte pas de façon fiable. Une règle typographique est de toute façon
- * mieux appliquée par du code que par un modèle : ici c'est garanti, immédiat,
- * et ça ne coûte pas un token.
- */
-function stripDashes(text: string): string {
-  return text.replace(/\s*[—–]\s*/g, ', ');
 }
 
 async function* relay(

@@ -47,3 +47,6 @@ supabase/.temp/
 
 # Vercel CLI (contient l'ID du projet, lié au compte)
 .vercel/
+
+.vercel
+.env*
