@@ -1,0 +1,422 @@
+/* Direction artistique Wenoble — surface claire. */
+:root {
+  --wn-bg: #ffffff;
+  --wn-fg: #313131; /* texte primaire */
+  --wn-muted: #6b7280; /* texte secondaire */
+  --wn-accent: #ff8700; /* réservé — non utilisé dans le widget pour l'instant */
+  --wn-accent-secondary: #5000ff; /* couleur active du widget */
+
+  /* Dérivés */
+  --wn-border: rgb(49 49 49 / 12%);
+  --wn-border-soft: #f2f2f2; /* bordure du bouton d'envoi */
+  --wn-surface-raised: #f2f2f2; /* bulles assistant, hover */
+  --wn-accent-fg: #ffffff; /* flèche posée sur le violet */
+
+  /* Hauteur de la zone de conversation une fois le widget déplié. */
+  --wn-conv-height: 22rem;
+}
+
+.demo-page {
+  font-family: system-ui, sans-serif;
+  max-width: 40rem;
+  margin: 4rem auto;
+  padding: 0 1.5rem;
+  color: var(--wn-fg);
+}
+
+.demo-page p {
+  color: var(--wn-muted);
+}
+
+/* --- Conteneur : ancré en bas, centré horizontalement --- */
+.wn-widget {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translate(-50%, 0);
+  z-index: 2147483000;
+
+  display: flex;
+  flex-direction: column;
+  width: min(36rem, calc(100vw - 2rem));
+
+  background: var(--wn-bg);
+  color: var(--wn-fg);
+  border: 1px solid var(--wn-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 12px 40px rgb(49 49 49 / 14%);
+  overflow: hidden;
+  font-family: system-ui, sans-serif;
+
+  transition:
+    transform 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 240ms ease;
+}
+
+/* Escamoté sous le bord bas de l'écran. C'est l'état initial (le widget
+   n'apparaît pas au chargement) et celui du défilement vers le bas.
+   `visibility` empêche de tabuler dans un widget invisible. */
+.wn-widget--hidden {
+  transform: translate(-50%, calc(100% + 1.5rem));
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* --- En-tête : masqué tant que le widget est replié --- */
+.wn-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+
+  /* Replié : hauteur nulle, invisible. Déplié : voir .wn-widget--open. */
+  height: 0;
+  padding: 0 1rem;
+  border-bottom: 1px solid transparent;
+  opacity: 0;
+  overflow: hidden;
+
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition:
+    height 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 200ms ease,
+    padding 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Logo : hauteur fixe, largeur déduite du ratio du viewBox (189/30). Il prend la
+   couleur du texte via `currentColor` — le SVG d'origine était en `white`, donc
+   invisible sur le fond blanc du widget. */
+.wn-logo {
+  height: 0.9rem;
+  width: auto;
+  color: var(--wn-fg);
+  flex-shrink: 0;
+  
+}
+
+.wn-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  aspect-ratio: 1/1;
+  background: transparent;
+  color: var(--wn-muted);
+  font-size: 1.125rem;
+  line-height: 1;
+  width: 1.75rem;
+  cursor: pointer;
+  border-radius: 0.375rem;
+}
+
+.wn-close:hover {
+  background: var(--wn-surface-raised);
+  color: var(--wn-fg);
+}
+
+/* --- Conversation : c'est elle qui « pousse » la hauteur du widget --- */
+.wn-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+
+  /* Replié : hauteur nulle. L'animation de height crée l'effet d'agrandissement. */
+  height: 0;
+  padding: 0 1rem;
+  opacity: 0;
+  overflow-y: hidden;
+
+  transition:
+    height 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 240ms ease,
+    padding 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* --- État déplié --- */
+.wn-widget--open .wn-header {
+  height: 2.75rem;
+  border-bottom-color: var(--wn-border);
+  opacity: 1;
+}
+
+.wn-widget--open .wn-messages {
+  height: var(--wn-conv-height);
+  padding: 1rem;
+  opacity: 1;
+  overflow-y: auto;
+}
+
+/* --- Bulles --- */
+.wn-msg {
+  max-width: 85%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  animation: wn-msg-in 220ms ease both;
+}
+
+/* Violet plein pour l'utilisateur, gris clair pour l'assistant. Aucune bordure. */
+.wn-msg--user {
+  align-self: flex-end;
+  background: var(--wn-accent-secondary);
+  color: #ffffff;
+  border-bottom-right-radius: 0.25rem;
+}
+
+.wn-msg--assistant {
+  align-self: flex-start;
+  background: var(--wn-surface-raised); /* #f2f2f2 */
+  color: var(--wn-fg);
+  border-bottom-left-radius: 0.25rem;
+}
+
+/* Rendu Markdown dans les bulles de l'assistant. On neutralise les marges par
+   défaut du navigateur, qui feraient exploser la hauteur des bulles. */
+.wn-msg p {
+  margin: 0;
+}
+
+.wn-msg p + p,
+.wn-msg p + ul,
+.wn-msg ul + p {
+  margin-top: 0.5rem;
+}
+
+.wn-msg ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.wn-msg li {
+  margin: 0.15rem 0;
+}
+
+.wn-msg strong {
+  font-weight: 600;
+}
+
+/* Liens dans les réponses : soulignés et en violet, pour rester repérables même
+   dans une bulle grise. */
+.wn-link {
+  color: var(--wn-accent-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 500;
+}
+
+.wn-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+/* Sur une bulle violette (message du visiteur), le lien doit rester lisible. */
+.wn-msg--user .wn-link {
+  color: #ffffff;
+}
+
+@keyframes wn-msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- Indicateur de saisie : trois points qui rebondissent en cascade --- */
+.wn-typing {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0;
+}
+
+.wn-typing span {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: var(--wn-accent-secondary);
+  opacity: 0.5;
+  animation: wn-bounce 1.2s ease-in-out infinite;
+}
+
+/* Le décalage crée la cascade : chaque point part un cran après le précédent. */
+.wn-typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.wn-typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes wn-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-0.3rem);
+    opacity: 1;
+  }
+}
+
+/* --- Questions prédéfinies : grille 2x2, juste au-dessus de la barre de saisie ---
+   Placée entre la conversation et le formulaire (et non dans la zone de messages),
+   elle reste collée à l'input et ne défile pas avec l'historique. Elle est retirée
+   du DOM au premier envoi. */
+.wn-suggestions {
+  /* Masquée tant que le widget est replié : elle n'est plus dans .wn-messages,
+     elle ne bénéficie donc plus du repli de celle-ci. Sans ça, les cartes
+     resteraient visibles au-dessus de la barre de saisie une fois la fenêtre
+     fermée. */
+  display: none;
+
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+}
+
+.wn-widget--open .wn-suggestions {
+  display: grid;
+  animation: wn-msg-in 260ms ease both;
+}
+
+.wn-suggestion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.5rem;
+  font-size: 0.8125rem;
+
+  border: 1px solid var(--wn-border);
+  border-radius: 0.75rem;
+  background: var(--wn-bg);
+  color: var(--wn-fg);
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    transform 150ms ease;
+}
+
+.wn-suggestion:hover {
+  background: rgba(119, 119, 119, 0.05);
+}
+
+/* --- Barre de saisie : toujours visible, c'est le point d'entrée --- */
+.wn-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+/* Enveloppe du champ : porte la bordure et loge l'icône AI à gauche. */
+.wn-input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--wn-border);
+  border-radius: 0.5rem;
+  background: var(--wn-bg);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.wn-input-wrap:focus-within {
+  border-color: var(--wn-accent-secondary);
+  box-shadow: 0 0 0 3px rgb(80 0 255 / 18%);
+}
+
+.wn-input-icon {
+  position: absolute;
+  left: 0.75rem;
+  color: var(--wn-accent-secondary);
+  pointer-events: none;
+}
+
+.wn-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.625rem 0.875rem 0.625rem 2.25rem; /* place pour l'icône */
+  border: none;
+  border-radius: inherit;
+  background: transparent;
+  font: inherit;
+  font-size: 0.9375rem;
+  color: var(--wn-fg);
+  outline: none;
+}
+
+.wn-input::placeholder {
+  color: var(--wn-muted);
+}
+
+.wn-send {
+  flex-shrink: 0;
+  width: 2.375rem;
+  height: 2.375rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--wn-border-soft);
+  border-radius: 0.5rem;
+  background: var(--wn-accent-secondary);
+  color: var(--wn-accent-fg);
+  cursor: pointer;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+}
+
+.wn-send:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.wn-send:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Respect des préférences d'accessibilité : pas d'animation si l'utilisateur n'en veut pas. */
+@media (prefers-reduced-motion: reduce) {
+  .wn-widget,
+  .wn-header,
+  .wn-messages,
+  .wn-msg,
+  .wn-suggestions,
+  .wn-suggestion,
+  .wn-input-wrap,
+  .wn-send {
+    transition: none;
+    animation: none;
+  }
+
+  /* On garde une pulsation d'opacité : sans aucun signal, l'utilisateur ne
+     saurait pas qu'une réponse est en cours de génération. */
+  .wn-typing span {
+    animation: wn-fade 1.2s ease-in-out infinite;
+  }
+
+  @keyframes wn-fade {
+    0%,
+    100% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+}

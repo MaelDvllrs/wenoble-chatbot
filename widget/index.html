@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Widget Wenoble — prototype local</title>
+    <link rel="stylesheet" href="widget.css" />
+  </head>
+  <body>
+    <main class="demo-page">
+      <h1>Page de démo</h1>
+      <p>
+        Le widget est masqué au chargement. <strong>Descendez, puis remontez</strong> : il
+        n'apparaît qu'au défilement vers le haut. Cette page est volontairement longue pour
+        rendre ce comportement testable.
+      </p>
+      <p>
+        Une fois visible, cliquez dans le champ : la fenêtre s'ouvre avec un message d'accueil et
+        quatre questions prédéfinies. Le widget ne se cache plus tant que la conversation est
+        ouverte.
+      </p>
+
+      <!-- Remplissage : sert uniquement à rendre la page défilante. -->
+      <section aria-hidden="true">
+        <p style="height: 60vh"></p>
+        <h2>Section intermédiaire</h2>
+        <p style="height: 80vh"></p>
+        <h2>Encore un peu plus bas</h2>
+        <p style="height: 80vh"></p>
+        <h2>Bas de page</h2>
+        <p>Remontez maintenant : le widget doit surgir depuis le bas.</p>
+        <p style="height: 30vh"></p>
+      </section>
+    </main>
+
+    <script>
+      // Configuration lue par widget.js. En production, ces valeurs seront
+      // injectées par le snippet d'intégration posé sur le site Wenoble.
+      window.WENOBLE_CHAT_CONFIG = {
+        backendUrl: 'http://localhost:3001',
+      };
+    </script>
+    <script src="widget.js"></script>
+  </body>
+</html>

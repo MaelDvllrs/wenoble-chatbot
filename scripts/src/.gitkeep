@@ -1,0 +1,5 @@
+# Scripts d'ingestion à écrire :
+#   chunk.ts — découpe le contenu du site + le brandbook en chunks
+#   embed.ts — génère les embeddings via Voyage AI et remplit la table `documents`
+#
+# Lancer avec : npm run chunk --workspace scripts

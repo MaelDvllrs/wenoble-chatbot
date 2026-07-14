@@ -1,0 +1,176 @@
+# Déploiement
+
+Architecture cible :
+
+| Composant | Hébergement | URL |
+| --- | --- | --- |
+| Backend Fastify | VPS (systemd + nginx) | `https://ask-ai.wenoble.fr` |
+| Widget (JS/CSS) | servi par le backend | `https://ask-ai.wenoble.fr/widget/widget.js` |
+| Admin Next.js | Vercel | `https://admin.wenoble.fr` (ou `*.vercel.app`) |
+| Base de données | Supabase | — |
+
+Le widget est servi par le backend : le site n'a donc qu'**une seule origine** à
+connaître, et il n'y a pas de second hébergement à maintenir.
+
+---
+
+## 1. Backend sur le VPS
+
+### Prérequis
+
+Node 20+, nginx, et un utilisateur dédié (le backend ne doit pas tourner en root) :
+
+```bash
+sudo adduser --system --group --home /opt/wenoble-chatbot wenoble
+```
+
+### Déploiement
+
+```bash
+sudo -u wenoble git clone <url-du-depot> /opt/wenoble-chatbot
+cd /opt/wenoble-chatbot
+sudo -u wenoble npm ci
+sudo -u wenoble npm run build --workspace backend
+```
+
+### Variables d'environnement
+
+Crée `/opt/wenoble-chatbot/backend/.env` :
+
+```bash
+NODE_ENV=production
+PORT=3001
+
+SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=...
+ANTHROPIC_API_KEY=...
+CHAT_MODEL=claude-sonnet-5
+VOYAGE_API_KEY=...
+VOYAGE_MODEL=voyage-3
+
+# Uniquement le site. Pas de localhost en production.
+ALLOWED_ORIGINS=https://wenoble.fr,https://www.wenoble.fr
+
+# NOUVEAU secret, différent de celui de dev :
+#   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+COOKIE_SECRET=...
+COOKIE_SAMESITE=lax
+COOKIE_DOMAIN=
+
+RATE_LIMIT_MAX=20
+RATE_LIMIT_WINDOW=5 minutes
+MAX_MESSAGES_PER_CONVERSATION=40
+```
+
+Ce fichier contient la clé `service_role`, qui **contourne toute RLS** :
+
+```bash
+sudo chown wenoble:wenoble /opt/wenoble-chatbot/backend/.env
+sudo chmod 600 /opt/wenoble-chatbot/backend/.env
+```
+
+`COOKIE_SAMESITE=lax` suffit car `wenoble.fr` et `ask-ai.wenoble.fr` partagent le
+même domaine racine : pour le navigateur, c'est le **même site**. Pas besoin de
+`SameSite=None`, donc aucune dépendance aux cookies tiers.
+
+`NODE_ENV=production` active automatiquement le flag `Secure` du cookie et
+`trustProxy` (IP réelle du visiteur derrière nginx).
+
+### Service et reverse proxy
+
+```bash
+sudo cp deploy/wenoble-chatbot.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now wenoble-chatbot
+journalctl -u wenoble-chatbot -f
+
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/ask-ai.wenoble.fr
+sudo ln -s /etc/nginx/sites-available/ask-ai.wenoble.fr /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d ask-ai.wenoble.fr
+```
+
+HTTPS n'est pas optionnel : le cookie de session est `Secure` en production, un
+navigateur le refuserait en HTTP et la conversation ne survivrait pas au refresh.
+
+La conf nginx désactive `proxy_buffering` — **indispensable** : sans cela, nginx
+retient la réponse de `/chat` et la livre d'un bloc, ce qui annule le streaming.
+
+### Vérification
+
+```bash
+curl https://ask-ai.wenoble.fr/health          # {"status":"ok"}
+curl -I https://ask-ai.wenoble.fr/widget/widget.js
+```
+
+---
+
+## 2. Admin sur Vercel
+
+Dans Vercel → **New Project** → importer le dépôt :
+
+- **Root Directory** : `wenoble-chatbot/admin`
+- **Framework** : Next.js (détecté)
+- Laisser « Include files outside root directory » **activé** : le `package-lock.json`
+  est à la racine du monorepo (npm workspaces).
+
+Variables d'environnement (Production) :
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+NEXT_PUBLIC_BACKEND_URL=https://ask-ai.wenoble.fr
+```
+
+**Ne jamais mettre `SUPABASE_SERVICE_ROLE_KEY` dans Vercel.** L'admin lit la base
+avec la clé `anon` + la session de l'utilisateur : c'est la RLS qui protège les
+données. La clé `service_role` reste sur le VPS, exclusivement.
+
+Dans Supabase → **Authentication → URL Configuration**, ajoute l'URL Vercel dans
+les *Redirect URLs*.
+
+---
+
+## 3. Intégration du widget sur le site
+
+Dans Webflow → **Project Settings → Custom Code → Footer**, ou juste avant
+`</body>` :
+
+```html
+<link rel="stylesheet" href="https://ask-ai.wenoble.fr/widget/widget.css" />
+<script>
+  window.WENOBLE_CHAT_CONFIG = {
+    backendUrl: 'https://ask-ai.wenoble.fr',
+  };
+</script>
+<script src="https://ask-ai.wenoble.fr/widget/widget.js" defer></script>
+```
+
+---
+
+## 4. Mises à jour
+
+**Backend :**
+
+```bash
+cd /opt/wenoble-chatbot
+sudo -u wenoble git pull
+sudo -u wenoble npm ci
+sudo -u wenoble npm run build --workspace backend
+sudo systemctl restart wenoble-chatbot
+```
+
+**Admin :** un `git push` suffit, Vercel redéploie.
+
+**Contenu (après une modification du site) :**
+
+```bash
+npm run chunk --workspace scripts   # ne consomme aucun token
+npm run embed --workspace scripts   # n'embedde que les chunks modifiés
+sudo systemctl restart wenoble-chatbot
+```
+
+Le redémarrage est **nécessaire** : le sitemap injecté dans le system prompt est
+construit une seule fois au démarrage (il doit rester identique d'une requête à
+l'autre pour que le prompt caching d'Anthropic fonctionne). Sans redémarrage, les
+nouvelles pages resteront invisibles pour le modèle.

@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Builds
+dist/
+build/
+out/
+.next/
+next-env.d.ts
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Caches
+.cache/
+scripts/.cache/
+
+# Contenu source de l'ingestion (brandbook, PDF internes).
+# Documents de marque : ils n'ont pas à se retrouver sur GitHub ni chez Vercel,
+# et le backend n'en a pas besoin — seuls les chunks embeddés vivent en base.
+scripts/content/
+.turbo/
+*.tsbuildinfo
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Supabase CLI
+supabase/.branches/
+supabase/.temp/

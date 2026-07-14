@@ -1,0 +1,25 @@
+{
+  "name": "wenoble-chatbot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chatbot RAG pour le site Wenoble — backend Fastify, admin Next.js, widget vanilla JS.",
+  "workspaces": [
+    "backend",
+    "admin",
+    "scripts"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:admin": "npm run dev --workspace admin",
+    "dev:widget": "npx --yes serve widget",
+    "build": "npm run build --workspace backend && npm run build --workspace admin",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "sharp@0.34.5": true
+  }
+}
