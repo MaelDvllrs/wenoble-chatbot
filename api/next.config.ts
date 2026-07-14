@@ -1,13 +1,22 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { NextConfig } from 'next';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   /**
-   * Racine du monorepo. Sans ça, Next remonte trop haut (il trouve un autre
-   * package-lock.json sur la machine) et trace les fichiers depuis le mauvais
-   * dossier.
+   * Racine du traçage = ce dossier (api/), et rien au-dessus.
+   *
+   * Pointer vers le parent faisait échouer le déploiement : sur Vercel, seul
+   * `api/` est envoyé, donc `..` désigne un dossier HORS du projet. Next
+   * générait alors des chemins imbriqués et Vercel cherchait `.next` dans
+   * `path0/path0` (ENOENT sur routes-manifest.json).
+   *
+   * En local, ce réglage fait aussi taire l'avertissement « multiple lockfiles »
+   * dû au monorepo.
    */
-  outputFileTracingRoot: path.join(process.cwd(), '..'),
+  outputFileTracingRoot: here,
 
   /**
    * Le system prompt est un .md lu au runtime avec `fs`.
