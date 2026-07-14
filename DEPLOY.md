@@ -4,7 +4,7 @@ Architecture cible :
 
 | Composant | Hébergement | URL |
 | --- | --- | --- |
-| Backend Fastify | VPS (systemd + nginx) | `https://ask-ai.wenoble.fr` |
+| Backend Fastify | VPS (PM2 + nginx) | `https://ask-ai.wenoble.fr` |
 | Widget (JS/CSS) | servi par le backend | `https://ask-ai.wenoble.fr/widget/widget.js` |
 | Admin Next.js | Vercel | `https://admin.wenoble.fr` (ou `*.vercel.app`) |
 | Base de données | Supabase | — |
@@ -18,9 +18,11 @@ connaître, et il n'y a pas de second hébergement à maintenir.
 
 ### Prérequis
 
-Node 20+, nginx, et un utilisateur dédié (le backend ne doit pas tourner en root) :
+Node 20+, nginx, PM2, et un utilisateur dédié (le backend ne doit pas tourner en
+root) :
 
 ```bash
+sudo npm install -g pm2
 sudo adduser --system --group --home /opt/wenoble-chatbot wenoble
 ```
 
@@ -76,14 +78,29 @@ même domaine racine : pour le navigateur, c'est le **même site**. Pas besoin d
 `NODE_ENV=production` active automatiquement le flag `Secure` du cookie et
 `trustProxy` (IP réelle du visiteur derrière nginx).
 
-### Service et reverse proxy
+### Lancement avec PM2
 
 ```bash
-sudo cp deploy/wenoble-chatbot.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now wenoble-chatbot
-journalctl -u wenoble-chatbot -f
+cd /opt/wenoble-chatbot
+sudo -u wenoble pm2 start deploy/ecosystem.config.cjs
+sudo -u wenoble pm2 save        # persiste la liste des process
+sudo -u wenoble pm2 startup     # relance PM2 au reboot (suivre la commande affichée)
 
+sudo -u wenoble pm2 logs wenoble-chatbot
+sudo -u wenoble pm2 status
+```
+
+Le backend tourne en mode **`fork`, une seule instance** — c'est délibéré. En
+mode `cluster`, chaque worker aurait sa propre mémoire, donc son propre compteur
+de rate limit (`@fastify/rate-limit` stocke en mémoire) : la limite réelle serait
+multipliée par le nombre de workers, et un abuseur pourrait envoyer N × 20
+requêtes. Le backend passe l'essentiel de son temps à attendre Claude, Voyage et
+Supabase : un seul process encaisse largement le trafic d'un site vitrine. Passer
+en cluster imposerait d'abord de déporter le rate limit dans Redis.
+
+### Reverse proxy
+
+```bash
 sudo cp deploy/nginx.conf /etc/nginx/sites-available/ask-ai.wenoble.fr
 sudo ln -s /etc/nginx/sites-available/ask-ai.wenoble.fr /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
@@ -157,7 +174,7 @@ cd /opt/wenoble-chatbot
 sudo -u wenoble git pull
 sudo -u wenoble npm ci
 sudo -u wenoble npm run build --workspace backend
-sudo systemctl restart wenoble-chatbot
+pm2 restart wenoble-chatbot
 ```
 
 **Admin :** un `git push` suffit, Vercel redéploie.
@@ -167,7 +184,7 @@ sudo systemctl restart wenoble-chatbot
 ```bash
 npm run chunk --workspace scripts   # ne consomme aucun token
 npm run embed --workspace scripts   # n'embedde que les chunks modifiés
-sudo systemctl restart wenoble-chatbot
+pm2 restart wenoble-chatbot
 ```
 
 Le redémarrage est **nécessaire** : le sitemap injecté dans le system prompt est
