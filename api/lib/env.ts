@@ -41,8 +41,14 @@ function load(): Env {
   const parsed = schema.safeParse(process.env);
 
   if (!parsed.success) {
-    console.error('Variables d’environnement invalides :', z.treeifyError(parsed.error));
-    throw new Error('Configuration invalide — voir api/.env.example');
+    // Les noms des variables fautives sont inclus dans le message : sans eux, on
+    // ne voit qu'un « Configuration invalide » opaque dans les logs Vercel, et
+    // il faut deviner laquelle manque. On ne logue JAMAIS les valeurs.
+    const details = parsed.error.issues
+      .map((issue) => `${issue.path.join('.')} (${issue.message})`)
+      .join(', ');
+
+    throw new Error(`Variables d'environnement invalides ou manquantes : ${details}`);
   }
 
   return {
