@@ -356,7 +356,10 @@
   border-radius: inherit;
   background: transparent;
   font: inherit;
-  font-size: 0.9375rem;
+  /* 16px exactement : en dessous, iOS zoome automatiquement sur le champ au
+     focus et décale la page. C'est le seul moyen propre de l'éviter (sans
+     bloquer le zoom global de la page, contrairement à user-scalable=no). */
+  font-size: 16px;
   color: var(--wn-fg);
   outline: none;
 }
@@ -367,6 +370,9 @@
 
 .wn-send {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 2.375rem;
   height: 2.375rem;
   display: grid;
@@ -388,6 +394,50 @@
 .wn-send:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+/* --- Mobile --- */
+@media (max-width: 600px) {
+  :root {
+    /* Sur un écran de téléphone, 22rem de conversation + le clavier virtuel ne
+       tiennent pas : la barre de saisie serait poussée hors de l'écran. */
+    --wn-conv-height: 15rem;
+  }
+
+  .wn-widget {
+    /* Moins large : le widget ne colle plus aux bords de l'écran. */
+    width: calc(100vw - 1.5rem);
+    bottom: 0.75rem;
+  }
+
+  /* Les questions passent en colonne : sur deux colonnes, chaque carte devient
+     trop étroite et le texte se casse sur trois lignes. */
+  .wn-suggestions {
+    grid-template-columns: 1fr;
+    gap: 0.375rem;
+
+    /* Quatre cartes empilées mangeraient tout l'écran : on plafonne et on fait
+       défiler. */
+    max-height: 8.5rem;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .wn-suggestions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .wn-suggestion {
+    /* En colonne, la carte est large : le texte est aligné à gauche, comme une
+       liste, plutôt que centré. */
+    justify-content: flex-start;
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .wn-msg {
+    max-width: 90%;
+  }
 }
 
 /* Respect des préférences d'accessibilité : pas d'animation si l'utilisateur n'en veut pas. */
